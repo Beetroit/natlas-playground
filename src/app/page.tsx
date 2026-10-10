@@ -28,13 +28,7 @@ export default function Playground() {
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content:
-        "Ẹ n lẹ o! Sannu da zuwa! Nnọọ! I am N-ATLAS, Nigeria's Sovereign Multilingual AI. Ask me anything in Yorùbá, Hausa, Igbo, Nigerian Pidgin, or English, or record a voice note below.",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [language, setLanguage] = useState<SupportedLanguage>("yoruba");
   const [toneEnforcement, setToneEnforcement] = useState(true);
@@ -539,33 +533,107 @@ export default function Playground() {
           />
         ) : (
           <main className="flex flex-1 flex-col overflow-hidden bg-slate-50/50">
-            {/* Message Stream */}
+            {/* Message Stream or Center Hero Greeting */}
             <div
               ref={chatContainerRef}
               onScroll={handleChatScroll}
-              className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4"
+              className="flex-1 overflow-y-auto p-4 sm:p-6"
             >
-              {messages.map((msg, idx) => (
-                <div
-                  key={idx}
-                  className={`flex ${
-                    msg.role === "user" ? "justify-end" : "justify-start"
-                  }`}
-                >
-                  <div
-                    className={`max-w-[88%] sm:max-w-2xl rounded-2xl px-4 py-3 sm:px-5 sm:py-3.5 text-xs sm:text-sm leading-relaxed shadow-sm ${
-                      msg.role === "user"
-                        ? "bg-emerald-600 text-white rounded-br-none"
-                        : "bg-white text-slate-800 border border-slate-200/80 rounded-bl-none"
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap">
-                      {msg.content || (isStreaming ? "Thinking..." : "")}
-                    </p>
+              {messages.length === 0 ? (
+                <div className="flex h-full min-h-[380px] flex-col items-center justify-center text-center px-4 animate-in fade-in duration-300">
+                  <div className="mx-auto flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-3xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-emerald-500 text-white text-3xl sm:text-4xl font-black shadow-xl ring-8 ring-emerald-500/10 mb-5">
+                    ₦
+                  </div>
+
+                  <div className="inline-flex items-center space-x-1.5 rounded-full bg-emerald-100/90 px-3.5 py-1 text-[11px] sm:text-xs font-bold text-emerald-800 border border-emerald-200/80 mb-3.5 shadow-2xs">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Nigeria&apos;s Sovereign Multilingual AI • NAIC 2026</span>
+                  </div>
+
+                  <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-slate-900 mb-3 max-w-2xl leading-tight">
+                    <span className="bg-gradient-to-r from-emerald-700 via-teal-600 to-emerald-800 bg-clip-text text-transparent">
+                      Ẹ n lẹ o! Sannu da zuwa! Nnọọ!
+                    </span>
+                  </h1>
+
+                  <p className="max-w-lg text-xs sm:text-sm text-slate-600 leading-relaxed mb-6 font-medium">
+                    I am <strong className="text-slate-900">N-ATLAS</strong>. Ask me anything in{" "}
+                    <span className="text-emerald-700 font-semibold">Yorùbá</span>,{" "}
+                    <span className="text-teal-700 font-semibold">Hausa</span>,{" "}
+                    <span className="text-emerald-800 font-semibold">Igbo</span>,{" "}
+                    <span className="text-amber-700 font-semibold">Nigerian Pidgin</span>, or{" "}
+                    <span className="text-slate-800 font-semibold">English</span>, or record a voice note below.
+                  </p>
+
+                  {/* Dialect Highlights */}
+                  <div className="flex flex-wrap items-center justify-center gap-2 max-w-xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLanguage("yoruba");
+                        setInput("Bawo ni mo se le da ile-iṣẹ mi silẹ ni Nigeria?");
+                      }}
+                      className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-1.5 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100/80 transition-colors shadow-2xs cursor-pointer"
+                    >
+                      🟢 Yorùbá: Tones & Accents
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLanguage("hausa");
+                        setInput("Yaya ake shuka masara a lokacin damina?");
+                      }}
+                      className="rounded-xl border border-teal-200 bg-teal-50/60 px-3 py-1.5 text-[11px] font-semibold text-teal-800 hover:bg-teal-100/80 transition-colors shadow-2xs cursor-pointer"
+                    >
+                      🟢 Hausa: Agriculture & Trade
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLanguage("igbo");
+                        setInput("Kọwaara m uru agụmakwụkwọ bara nye ụmụaka.");
+                      }}
+                      className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-1.5 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100/80 transition-colors shadow-2xs cursor-pointer"
+                    >
+                      🟢 Igbo: Culture & Education
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLanguage("pidgin");
+                        setInput("How I fit start tech career for Lagos?");
+                      }}
+                      className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-1.5 text-[11px] font-semibold text-amber-800 hover:bg-amber-100/80 transition-colors shadow-2xs cursor-pointer"
+                    >
+                      🟢 Pidgin: Lagos Tech & Street
+                    </button>
                   </div>
                 </div>
-              ))}
-              <div ref={messagesEndRef} />
+              ) : (
+                <div className="space-y-4">
+                  {messages.map((msg, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex ${
+                        msg.role === "user" ? "justify-end" : "justify-start"
+                      }`}
+                    >
+                      <div
+                        className={`max-w-[88%] sm:max-w-2xl rounded-2xl px-4 py-3 sm:px-5 sm:py-3.5 text-xs sm:text-sm leading-relaxed shadow-sm ${
+                          msg.role === "user"
+                            ? "bg-emerald-600 text-white rounded-br-none"
+                            : "bg-white text-slate-800 border border-slate-200/80 rounded-bl-none"
+                        }`}
+                      >
+                        <p className="whitespace-pre-wrap">
+                          {msg.content || (isStreaming ? "Thinking..." : "")}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
             </div>
 
             {/* Voice Transcribed Banner */}

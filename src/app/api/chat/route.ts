@@ -22,6 +22,8 @@ export async function POST(req: NextRequest): Promise<Response> {
       messages,
       language,
       toneEnforcement,
+      temperature: language === "pidgin" ? 0.3 : 0.1,
+      repetitionPenalty: 1.18,
     });
 
     const encoder = new TextEncoder();
