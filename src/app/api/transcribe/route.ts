@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Natlas, type SupportedLanguage } from "@natlas/sdk";
+import { Natlas, APIStatusError, type SupportedLanguage } from "@natlas/sdk";
 
 export const runtime = "nodejs";
 
@@ -25,7 +25,26 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(result);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "ASR transcription failed";
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    let errorMessage = error instanceof Error ? error.message : "ASR transcription failed";
+    let traceback: string | undefined;
+
+    if (error instanceof APIStatusError) {
+      try {
+        const parsed = JSON.parse(error.responseBody) as {
+          detail?: string;
+          error?: string;
+          traceback?: string;
+        };
+        errorMessage = parsed.detail || parsed.error || error.responseBody;
+        traceback = parsed.traceback;
+      } catch {
+        errorMessage = error.responseBody || error.message;
+      }
+    }
+
+    return NextResponse.json(
+      { error: errorMessage, traceback },
+      { status: 500 }
+    );
   }
 }

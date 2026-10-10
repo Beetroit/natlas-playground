@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Mic,
   MicOff,
@@ -48,6 +48,30 @@ export default function Playground() {
   const audioChunksRef = useRef<Blob[]>([]);
   const chatFileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Auto-scroll refs and handlers
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const isAtBottomRef = useRef(true);
+
+  const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
+    if (chatContainerRef.current && isAtBottomRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior,
+      });
+    }
+  };
+
+  const handleChatScroll = () => {
+    if (!chatContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 100;
+  };
+
+  useEffect(() => {
+    scrollToBottom("auto");
+  }, [messages]);
+
   // 1. Send chat message
   const handleSend = async (textToSend?: string) => {
     const text = textToSend ?? input;
@@ -58,6 +82,10 @@ export default function Playground() {
     setMessages(updatedMessages);
     if (!textToSend) setInput("");
     setIsStreaming(true);
+
+    // Ensure screen scrolls to bottom when user sends
+    isAtBottomRef.current = true;
+    scrollToBottom("smooth");
 
     // Placeholder for streaming reply
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
@@ -77,20 +105,59 @@ export default function Playground() {
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let streamedReply = "";
+      let incomingBuffer = "";
+      let renderedReply = "";
+      let isStreamDone = false;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        streamedReply += chunk;
+      // Smooth conversational typewriter drain loop
+      await new Promise<void>((resolve, reject) => {
+        let intervalId: ReturnType<typeof setInterval> | null = null;
 
-        setMessages((prev) => {
-          const clone = [...prev];
-          clone[clone.length - 1] = { role: "assistant", content: streamedReply };
-          return clone;
-        });
-      }
+        intervalId = setInterval(() => {
+          if (incomingBuffer.length > 0) {
+            // Adaptive drain rate: outputs tokens smoothly at human reading cadence
+            const drainCount =
+              incomingBuffer.length > 80
+                ? 6
+                : incomingBuffer.length > 30
+                ? 3
+                : 1;
+
+            const slice = incomingBuffer.slice(0, drainCount);
+            incomingBuffer = incomingBuffer.slice(drainCount);
+            renderedReply += slice;
+
+            setMessages((prev) => {
+              const clone = [...prev];
+              clone[clone.length - 1] = { role: "assistant", content: renderedReply };
+              return clone;
+            });
+            scrollToBottom("auto");
+          } else if (isStreamDone) {
+            if (intervalId) clearInterval(intervalId);
+            resolve();
+          }
+        }, 16);
+
+        // Network reader consuming chunks
+        (async () => {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) {
+                isStreamDone = true;
+                break;
+              }
+              const chunk = decoder.decode(value, { stream: true });
+              incomingBuffer += chunk;
+            }
+          } catch (readErr: unknown) {
+            isStreamDone = true;
+            if (intervalId) clearInterval(intervalId);
+            reject(readErr);
+          }
+        })();
+      });
     } catch (err: unknown) {
       const errorMsg =
         err instanceof Error ? err.message : "Error streaming response";
@@ -102,6 +169,7 @@ export default function Playground() {
         };
         return clone;
       });
+      scrollToBottom("auto");
     } finally {
       setIsStreaming(false);
     }
@@ -159,16 +227,25 @@ export default function Playground() {
         body: formData,
       });
 
-      const data = (await res.json()) as { text?: string; error?: string };
+      const data = (await res.json()) as {
+        text?: string;
+        error?: string;
+        traceback?: string;
+      };
       if (data.text) {
         setTranscribedText(data.text);
         setInput(data.text);
         return data.text;
       }
-      alert(data.error || "Transcription failed");
+      const errDetail = data.traceback
+        ? `${data.error || "Transcription failed"}\n\nTraceback:\n${data.traceback}`
+        : data.error || "Transcription failed";
+      alert(errDetail);
       return null;
-    } catch {
-      alert("Error sending audio to N-ATLAS ASR");
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Error sending audio to N-ATLAS ASR";
+      alert(msg);
       return null;
     } finally {
       setIsTranscribing(false);
@@ -463,7 +540,11 @@ export default function Playground() {
         ) : (
           <main className="flex flex-1 flex-col overflow-hidden bg-slate-50/50">
             {/* Message Stream */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+            <div
+              ref={chatContainerRef}
+              onScroll={handleChatScroll}
+              className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4"
+            >
               {messages.map((msg, idx) => (
                 <div
                   key={idx}
@@ -484,6 +565,7 @@ export default function Playground() {
                   </div>
                 </div>
               ))}
+              <div ref={messagesEndRef} />
             </div>
 
             {/* Voice Transcribed Banner */}

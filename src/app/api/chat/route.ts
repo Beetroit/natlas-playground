@@ -47,6 +47,8 @@ export async function POST(req: NextRequest): Promise<Response> {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
+        "X-Accel-Buffering": "no",
+        "Connection": "keep-alive",
       },
     });
   } catch (error: unknown) {

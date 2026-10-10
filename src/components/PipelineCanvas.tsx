@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   GripVertical,
   Mic,
@@ -11,6 +11,7 @@ import {
   Wand2,
   FileText,
   Play,
+  Pause,
   RotateCcw,
   Trash2,
   Plus,
@@ -21,6 +22,118 @@ import {
   ArrowDown,
 } from "lucide-react";
 import type { SupportedLanguage } from "@natlas/sdk";
+
+interface AudioPlayerWidgetProps {
+  blob: Blob;
+  fileName?: string | null;
+}
+
+function AudioPlayerWidget({ blob, fileName }: AudioPlayerWidgetProps) {
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const url = URL.createObjectURL(blob);
+    setAudioUrl(url);
+    setIsPlaying(false);
+    setCurrentTime(0);
+
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [blob]);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch(() => setIsPlaying(false));
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration || 0);
+    }
+  };
+
+  const handleEnded = () => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+  };
+
+  const formatSeconds = (sec: number) => {
+    if (isNaN(sec) || !isFinite(sec)) return "0:00";
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-2.5 shadow-2xs">
+      <audio
+        ref={audioRef}
+        src={audioUrl ?? undefined}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={handleEnded}
+        className="hidden"
+      />
+      <div className="flex items-center justify-between mb-1.5">
+        <span
+          className="text-[10px] font-semibold text-emerald-800 truncate max-w-[160px]"
+          title={fileName ?? "Audio"}
+        >
+          🎵 {fileName || "Audio Track"}
+        </span>
+        <span className="text-[10px] font-mono text-emerald-700">
+          {formatSeconds(currentTime)} / {formatSeconds(duration)}
+        </span>
+      </div>
+      <div className="flex items-center space-x-2">
+        <button
+          type="button"
+          onClick={togglePlay}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs transition-colors"
+          title={isPlaying ? "Pause" : "Play"}
+        >
+          {isPlaying ? (
+            <Pause className="h-3.5 w-3.5 fill-white" />
+          ) : (
+            <Play className="h-3.5 w-3.5 fill-white ml-0.5" />
+          )}
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={duration || 100}
+          step={0.1}
+          value={currentTime}
+          onChange={(e) => {
+            const val = parseFloat(e.target.value);
+            setCurrentTime(val);
+            if (audioRef.current) audioRef.current.currentTime = val;
+          }}
+          className="h-1.5 flex-1 accent-emerald-600 cursor-pointer"
+        />
+      </div>
+    </div>
+  );
+}
 
 export type CardType =
   | "audio-input"
@@ -361,14 +474,21 @@ export function PipelineCanvas({
           body: formData,
         });
 
-        const data = (await res.json()) as { text?: string; error?: string };
+        const data = (await res.json()) as {
+          text?: string;
+          error?: string;
+          traceback?: string;
+        };
         if (data.text) {
           updateCardField(targetCard.instanceId, "status", "completed");
           updateCardField(targetCard.instanceId, "outputText", data.text);
-          return { text: data.text };
+          return { text: data.text, audio: audioBlobToTranscribe };
         }
 
-        throw new Error(data.error || "Transcription failed");
+        const errDetail = data.traceback
+          ? `${data.error || "Transcription failed"}\n\nTraceback:\n${data.traceback}`
+          : data.error || "Transcription failed";
+        throw new Error(errDetail);
       }
 
       if (targetCard.type === "text-chat") {
@@ -551,10 +671,15 @@ export function PipelineCanvas({
     try {
       for (const card of cards) {
         const result = await runSingleCard(card, currentPayload);
+        const resolvedAudio = result.audio !== undefined ? result.audio : currentPayload.audio;
         currentPayload = {
           text: result.text || currentPayload.text,
-          audio: result.audio || currentPayload.audio,
+          audio: resolvedAudio,
         };
+        if (resolvedAudio && !card.audioBlob && card.type === "voice-to-text") {
+          updateCardField(card.instanceId, "audioBlob", resolvedAudio);
+          updateCardField(card.instanceId, "audioFileName", "chained_audio.webm");
+        }
       }
     } finally {
       setIsRunningFlow(false);
@@ -768,9 +893,43 @@ export function PipelineCanvas({
                               </button>
                             </div>
 
-                            {card.audioFileName && (
+                            {card.audioBlob ? (
+                              <AudioPlayerWidget
+                                blob={card.audioBlob}
+                                fileName={card.audioFileName}
+                              />
+                            ) : card.audioFileName ? (
                               <div className="rounded-lg bg-emerald-50 p-2 text-[11px] text-emerald-800 border border-emerald-100 truncate">
                                 🎙️ Ready: <strong>{card.audioFileName}</strong>
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
+
+                        {/* Voice to Text Audio Preview & Attach */}
+                        {card.type === "voice-to-text" && (
+                          <div className="space-y-1.5">
+                            {card.audioBlob ? (
+                              <div>
+                                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-1">
+                                  Audio Input Track:
+                                </span>
+                                <AudioPlayerWidget
+                                  blob={card.audioBlob}
+                                  fileName={card.audioFileName}
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-2 text-xs">
+                                <span className="text-[11px] text-slate-500">Audio source:</span>
+                                <button
+                                  type="button"
+                                  onClick={() => triggerFileUpload(card.instanceId)}
+                                  className="flex items-center space-x-1 rounded-lg bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-2xs transition-colors"
+                                >
+                                  <Upload className="h-3 w-3 text-slate-600" />
+                                  <span>Upload Audio</span>
+                                </button>
                               </div>
                             )}
                           </div>
