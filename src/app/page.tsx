@@ -6,61 +6,23 @@ import {
   MicOff,
   Upload,
   Send,
-  Volume2,
   ShieldCheck,
-  Sparkles,
   CheckCircle2,
   Code2,
   Layers,
   MessageSquare,
+  Sparkles,
+  Bot,
+  Terminal,
 } from "lucide-react";
 import type { SupportedLanguage } from "@natlas/sdk";
 import { CodeExportModal } from "../components/CodeExportModal";
-import { PipelineCanvas, type PipelineStep } from "../components/PipelineCanvas";
+import { PipelineCanvas } from "../components/PipelineCanvas";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
 }
-
-const INITIAL_PIPELINE_STEPS: PipelineStep[] = [
-  {
-    id: "audio-input",
-    title: "1. Voice / Audio Ingestion",
-    subtitle: "Browser microphone or WhatsApp voice note (.ogg/.opus/.webm)",
-    icon: Mic,
-    enabled: true,
-    status: "idle",
-    output: null,
-  },
-  {
-    id: "asr-transcribe",
-    title: "2. Sovereign NCAIR1 Whisper ASR",
-    subtitle: "Speech-to-text mapped to official Yoruba, Hausa, Igbo, English checkpoints",
-    icon: Volume2,
-    enabled: true,
-    status: "idle",
-    output: null,
-  },
-  {
-    id: "dialect-guard",
-    title: "3. Dialect Guard & Normalizer",
-    subtitle: "Unicode NFC tone orthography & anti-drift Nigerian system prompt priming",
-    icon: ShieldCheck,
-    enabled: true,
-    status: "idle",
-    output: null,
-  },
-  {
-    id: "llm-generate",
-    title: "4. N-ATLAS Sovereign LLM (8B)",
-    subtitle: "Multilingual reasoning and tone-accurate completion generation",
-    icon: Sparkles,
-    enabled: true,
-    status: "idle",
-    output: null,
-  },
-];
 
 export default function Playground() {
   const [activeView, setActiveView] = useState<"chat" | "pipeline">("chat");
@@ -78,18 +40,13 @@ export default function Playground() {
   const [toneEnforcement, setToneEnforcement] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
 
-  // Audio recording state
+  // Audio recording state for Chat view
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcribedText, setTranscribedText] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const lastRecordedBlobRef = useRef<Blob | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Pipeline canvas state
-  const [pipelineSteps, setPipelineSteps] = useState<PipelineStep[]>(INITIAL_PIPELINE_STEPS);
-  const [isExecutingPipeline, setIsExecutingPipeline] = useState(false);
+  const chatFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // 1. Send chat message
   const handleSend = async (textToSend?: string) => {
@@ -135,7 +92,8 @@ export default function Playground() {
         });
       }
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Error streaming response";
+      const errorMsg =
+        err instanceof Error ? err.message : "Error streaming response";
       setMessages((prev) => {
         const clone = [...prev];
         clone[clone.length - 1] = {
@@ -164,8 +122,9 @@ export default function Playground() {
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        lastRecordedBlobRef.current = audioBlob;
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/webm",
+        });
         await handleTranscribe(audioBlob);
         stream.getTracks().forEach((track) => track.stop());
       };
@@ -190,23 +149,6 @@ export default function Playground() {
     setIsTranscribing(true);
     setTranscribedText(null);
 
-    // Update pipeline status
-    setPipelineSteps((prev) =>
-      prev.map((s) => {
-        if (s.id === "audio-input") {
-          return {
-            ...s,
-            status: "completed",
-            output: `Audio payload captured (${(audioBlob.size / 1024).toFixed(1)} KB, type: ${audioBlob.type || "audio/webm"})`,
-          };
-        }
-        if (s.id === "asr-transcribe") {
-          return { ...s, status: "running", output: "Sending to NCAIR1 Whisper server..." };
-        }
-        return s;
-      })
-    );
-
     try {
       const formData = new FormData();
       formData.append("file", audioBlob, "voice_note.webm");
@@ -221,183 +163,34 @@ export default function Playground() {
       if (data.text) {
         setTranscribedText(data.text);
         setInput(data.text);
-
-        // Update pipeline step 2
-        setPipelineSteps((prev) =>
-          prev.map((s) => {
-            if (s.id === "asr-transcribe") {
-              return {
-                ...s,
-                status: "completed",
-                output: data.text ?? null,
-              };
-            }
-            return s;
-          })
-        );
         return data.text;
       }
       alert(data.error || "Transcription failed");
-      setPipelineSteps((prev) =>
-        prev.map((s) =>
-          s.id === "asr-transcribe" ? { ...s, status: "error", output: data.error || "Failed" } : s
-        )
-      );
       return null;
     } catch {
       alert("Error sending audio to N-ATLAS ASR");
-      setPipelineSteps((prev) =>
-        prev.map((s) =>
-          s.id === "asr-transcribe" ? { ...s, status: "error", output: "Connection error" } : s
-        )
-      );
       return null;
     } finally {
       setIsTranscribing(false);
     }
   };
 
-  // 5. Handle file upload
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 5. Handle file upload in chat view
+  const handleChatFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      lastRecordedBlobRef.current = file;
       void handleTranscribe(file);
     }
   };
 
-  // 6. Execute End-to-End Pipeline
-  const handleExecutePipeline = async (stepsToRun: PipelineStep[]) => {
-    setIsExecutingPipeline(true);
-
-    try {
-      let currentPayloadText = transcribedText || input;
-
-      for (const step of stepsToRun) {
-        if (!step.enabled) continue;
-
-        if (step.id === "audio-input") {
-          setPipelineSteps((prev) =>
-            prev.map((s) =>
-              s.id === "audio-input"
-                ? {
-                    ...s,
-                    status: "completed",
-                    output: lastRecordedBlobRef.current
-                      ? `Voice file present (${(lastRecordedBlobRef.current.size / 1024).toFixed(1)} KB)`
-                      : "Mock audio signal generated for testing",
-                  }
-                : s
-            )
-          );
-        }
-
-        if (step.id === "asr-transcribe") {
-          if (lastRecordedBlobRef.current) {
-            const result = await handleTranscribe(lastRecordedBlobRef.current);
-            if (result) currentPayloadText = result;
-          } else if (!currentPayloadText) {
-            currentPayloadText = "Bawo ni mo se le lo ero ayelujara N-ATLAS?";
-            setPipelineSteps((prev) =>
-              prev.map((s) =>
-                s.id === "asr-transcribe"
-                  ? {
-                      ...s,
-                      status: "completed",
-                      output: currentPayloadText,
-                    }
-                  : s
-              )
-            );
-          }
-        }
-
-        if (step.id === "dialect-guard") {
-          setPipelineSteps((prev) =>
-            prev.map((s) =>
-              s.id === "dialect-guard" ? { ...s, status: "running" } : s
-            )
-          );
-          await new Promise((r) => setTimeout(r, 300));
-          const guardedSummary = `Injected [${language.toUpperCase()}] tone constraints: diacritic NFC normalization & anti-drift priming active.`;
-          setPipelineSteps((prev) =>
-            prev.map((s) =>
-              s.id === "dialect-guard"
-                ? { ...s, status: "completed", output: guardedSummary }
-                : s
-            )
-          );
-        }
-
-        if (step.id === "llm-generate") {
-          setPipelineSteps((prev) =>
-            prev.map((s) =>
-              s.id === "llm-generate" ? { ...s, status: "running" } : s
-            )
-          );
-
-          const promptToSend = currentPayloadText || "Ẹ n lẹ o!";
-          const userMsg: Message = { role: "user", content: promptToSend };
-          const updatedMessages = [...messages, userMsg];
-          setMessages(updatedMessages);
-
-          // Stream generation
-          const res = await fetch("/api/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              messages: updatedMessages,
-              language,
-              toneEnforcement,
-            }),
-          });
-
-          if (!res.body) throw new Error("No response body");
-
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder();
-          let accumulated = "";
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            accumulated += chunk;
-            setPipelineSteps((prev) =>
-              prev.map((s) =>
-                s.id === "llm-generate"
-                  ? { ...s, status: "running", output: accumulated }
-                  : s
-              )
-            );
-          }
-
-          setPipelineSteps((prev) =>
-            prev.map((s) =>
-              s.id === "llm-generate"
-                ? { ...s, status: "completed", output: accumulated }
-                : s
-            )
-          );
-          setMessages((prev) => [...prev, { role: "assistant", content: accumulated }]);
-        }
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Pipeline failure";
-      alert(`Pipeline execution stopped: ${msg}`);
-    } finally {
-      setIsExecutingPipeline(false);
-    }
-  };
-
   return (
-    <div className="flex h-screen flex-col bg-slate-50 text-slate-900">
-      {/* Hidden file input for audio uploads */}
+    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-900 font-sans">
+      {/* Hidden file input for chat view */}
       <input
-        ref={fileInputRef}
+        ref={chatFileInputRef}
         type="file"
         accept="audio/*"
-        onChange={handleFileUpload}
+        onChange={handleChatFileUpload}
         className="hidden"
       />
 
@@ -409,120 +202,230 @@ export default function Playground() {
         toneEnforcement={toneEnforcement}
       />
 
-      {/* Header */}
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 shadow-sm">
-        <div className="flex items-center space-x-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold text-xl shadow-md">
+      {/* LEFT NAVIGATION SIDEBAR */}
+      <aside className="flex w-72 flex-col border-r border-slate-200 bg-white">
+        {/* Brand Header */}
+        <div className="flex items-center space-x-3 border-b border-slate-100 px-5 py-4">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold text-lg shadow-sm">
             ₦
           </div>
           <div>
-            <div className="flex items-center space-x-2">
-              <h1 className="text-lg font-bold text-slate-900">N-ATLAS Developer Playground</h1>
-              <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+            <div className="flex items-center space-x-1.5">
+              <h1 className="text-sm font-bold text-slate-900">N-ATLAS Studio</h1>
+              <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
                 NAIC 2026
               </span>
             </div>
-            <p className="text-xs text-slate-500">
-              Nigeria&apos;s Sovereign Multilingual LLM (Llama-3 8B) & Whisper ASR Suite
-            </p>
+            <p className="text-[11px] text-slate-500">Nigeria&apos;s Sovereign AI</p>
           </div>
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center space-x-3">
-          {/* View Mode Toggle */}
-          <div className="flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium border border-slate-200">
+        {/* View Switcher Tabs */}
+        <div className="p-4 border-b border-slate-100">
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-2 px-1">
+            Workspaces
+          </label>
+          <div className="flex flex-col space-y-1.5">
             <button
               type="button"
               onClick={() => setActiveView("chat")}
-              className={`flex items-center space-x-1.5 rounded-md px-3 py-1.5 transition-all ${
+              className={`flex items-center space-x-2.5 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all ${
                 activeView === "chat"
-                  ? "bg-white text-emerald-800 shadow-sm font-semibold"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-emerald-50 text-emerald-800 shadow-sm border border-emerald-200"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
-              <MessageSquare className="h-3.5 w-3.5" />
+              <MessageSquare className="h-4 w-4 text-emerald-600" />
               <span>Chat Stream</span>
             </button>
+
             <button
               type="button"
               onClick={() => setActiveView("pipeline")}
-              className={`flex items-center space-x-1.5 rounded-md px-3 py-1.5 transition-all ${
+              className={`flex items-center space-x-2.5 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all ${
                 activeView === "pipeline"
-                  ? "bg-white text-emerald-800 shadow-sm font-semibold"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-emerald-50 text-emerald-800 shadow-sm border border-emerald-200"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
-              <Layers className="h-3.5 w-3.5" />
-              <span>Pipeline Studio</span>
+              <Layers className="h-4 w-4 text-emerald-600" />
+              <span>Visual Studio</span>
             </button>
           </div>
+        </div>
 
-          {/* Export Code Button */}
+        {/* Prompt Starters */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-1 px-1">
+            Sample Prompts
+          </label>
+
           <button
             type="button"
-            onClick={() => setIsCodeModalOpen(true)}
-            className="flex items-center space-x-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
-            title="Export Copy-Paste Code Snippets (Python / TypeScript / cURL)"
+            onClick={() => {
+              setLanguage("yoruba");
+              setInput("Bawo ni mo se le da ile-iṣẹ mi silẹ ni Nigeria?");
+              if (activeView !== "chat") setActiveView("chat");
+            }}
+            className="w-full text-left rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs hover:border-emerald-500 hover:bg-emerald-50/40 transition-all"
           >
-            <Code2 className="h-4 w-4 text-emerald-600" />
-            <span>Export Code</span>
+            <p className="font-semibold text-emerald-800 text-[11px]">Yorùbá: Business</p>
+            <p className="text-slate-500 mt-0.5 truncate text-[11px]">
+              &ldquo;Bawo ni mo se le da ile-iṣẹ mi silẹ...&rdquo;
+            </p>
           </button>
 
-          {/* Language Selector */}
-          <div className="flex items-center space-x-2">
-            <label className="text-xs font-medium text-slate-600">Language:</label>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value as SupportedLanguage)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            >
-              <option value="yoruba">Yorùbá</option>
-              <option value="hausa">Hausa</option>
-              <option value="igbo">Igbo</option>
-              <option value="pidgin">Nigerian Pidgin</option>
-              <option value="english">Nigerian English</option>
-            </select>
-          </div>
-
-          {/* Tone Guard Toggle */}
           <button
             type="button"
-            onClick={() => setToneEnforcement(!toneEnforcement)}
-            className={`flex items-center space-x-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-              toneEnforcement
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm"
-                : "border-slate-200 bg-white text-slate-500"
-            }`}
+            onClick={() => {
+              setLanguage("hausa");
+              setInput("Yaya ake shuka masara a lokacin damina?");
+              if (activeView !== "chat") setActiveView("chat");
+            }}
+            className="w-full text-left rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs hover:border-emerald-500 hover:bg-emerald-50/40 transition-all"
           >
-            <ShieldCheck className="h-4 w-4" />
-            <span>Tone Guard: {toneEnforcement ? "ON" : "OFF"}</span>
+            <p className="font-semibold text-emerald-800 text-[11px]">Hausa: Agriculture</p>
+            <p className="text-slate-500 mt-0.5 truncate text-[11px]">
+              &ldquo;Yaya ake shuka masara a lokacin...&rdquo;
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setLanguage("igbo");
+              setInput("Kọwaara m uru agụmakwụkwọ bara nye ụmụaka.");
+              if (activeView !== "chat") setActiveView("chat");
+            }}
+            className="w-full text-left rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs hover:border-emerald-500 hover:bg-emerald-50/40 transition-all"
+          >
+            <p className="font-semibold text-emerald-800 text-[11px]">Igbo: Education</p>
+            <p className="text-slate-500 mt-0.5 truncate text-[11px]">
+              &ldquo;Kọwaara m uru agụmakwụkwọ bara...&rdquo;
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setLanguage("pidgin");
+              setInput("How I fit start tech career for Lagos?");
+              if (activeView !== "chat") setActiveView("chat");
+            }}
+            className="w-full text-left rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs hover:border-emerald-500 hover:bg-emerald-50/40 transition-all"
+          >
+            <p className="font-semibold text-emerald-800 text-[11px]">Pidgin: Career</p>
+            <p className="text-slate-500 mt-0.5 truncate text-[11px]">
+              &ldquo;How I fit start tech career for Lagos?&rdquo;
+            </p>
           </button>
         </div>
-      </header>
 
-      {/* Main Content Area */}
-      <div className="flex flex-1 overflow-hidden">
+        {/* SYSTEM DIAGNOSTICS AT BOTTOM OF SIDEBAR */}
+        <div className="border-t border-slate-200 bg-slate-50/80 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              System Diagnostics
+            </span>
+            <span className="flex items-center space-x-1 text-[10px] font-semibold text-emerald-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Live</span>
+            </span>
+          </div>
+
+          <div className="space-y-1.5 text-[11px]">
+            <div className="flex justify-between rounded-lg bg-white p-2 border border-slate-100 shadow-2xs">
+              <span className="text-slate-500">LLM Model</span>
+              <span className="font-semibold text-slate-800">Llama-3 8B (N-ATLaS)</span>
+            </div>
+            <div className="flex justify-between rounded-lg bg-white p-2 border border-slate-100 shadow-2xs">
+              <span className="text-slate-500">Voice ASR</span>
+              <span className="font-semibold text-slate-800">NCAIR1 Whisper</span>
+            </div>
+            <div className="flex justify-between rounded-lg bg-white p-2 border border-slate-100 shadow-2xs">
+              <span className="text-slate-500">SDK Target</span>
+              <span className="font-semibold text-slate-800">@natlas/sdk</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN WORKSPACE AREA */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Top Header */}
+        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3.5 shadow-2xs">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">
+              {activeView === "chat" ? "Multilingual Chat Stream" : "Visual Studio Flow"}
+            </h2>
+            <p className="text-xs text-slate-500">
+              {activeView === "chat"
+                ? "Talk to N-ATLAS with real-time text and voice input"
+                : "Assemble task cards to chain speech, translation, and AI chat"}
+            </p>
+          </div>
+
+          {/* Top Controls */}
+          <div className="flex items-center space-x-3">
+            {/* Export Code Button */}
+            <button
+              type="button"
+              onClick={() => setIsCodeModalOpen(true)}
+              className="flex items-center space-x-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+              title="Export ready-to-run Python, TypeScript, and cURL code"
+            >
+              <Code2 className="h-4 w-4 text-emerald-600" />
+              <span>Export Code</span>
+            </button>
+
+            {/* Language Selector */}
+            <div className="flex items-center space-x-2">
+              <label className="text-xs font-medium text-slate-600">Language:</label>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as SupportedLanguage)}
+                className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-2xs focus:border-emerald-500 focus:outline-none"
+              >
+                <option value="yoruba">Yorùbá</option>
+                <option value="hausa">Hausa</option>
+                <option value="igbo">Igbo</option>
+                <option value="pidgin">Nigerian Pidgin</option>
+                <option value="english">Nigerian English</option>
+              </select>
+            </div>
+
+            {/* Tone Guard Toggle */}
+            <button
+              type="button"
+              onClick={() => setToneEnforcement(!toneEnforcement)}
+              className={`flex items-center space-x-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors shadow-2xs ${
+                toneEnforcement
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-slate-200 bg-white text-slate-500"
+              }`}
+            >
+              <ShieldCheck className="h-4 w-4" />
+              <span>Tone Guard: {toneEnforcement ? "ON" : "OFF"}</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Content Body */}
         {activeView === "pipeline" ? (
           <PipelineCanvas
-            language={language}
+            currentLanguage={language}
             toneEnforcement={toneEnforcement}
-            onExecutePipeline={handleExecutePipeline}
-            isExecuting={isExecutingPipeline}
-            steps={pipelineSteps}
-            setSteps={setPipelineSteps}
-            onUploadAudioClick={() => fileInputRef.current?.click()}
-            onRecordMicClick={isRecording ? stopRecording : startRecording}
-            isRecording={isRecording}
           />
         ) : (
-          <main className="flex flex-1 flex-col overflow-hidden bg-slate-50">
-            {/* Chat Stream View */}
+          <main className="flex flex-1 flex-col overflow-hidden bg-slate-50/50">
+            {/* Message Stream */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {messages.map((msg, idx) => (
                 <div
                   key={idx}
-                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  className={`flex ${
+                    msg.role === "user" ? "justify-end" : "justify-start"
+                  }`}
                 >
                   <div
                     className={`max-w-2xl rounded-2xl px-5 py-3.5 text-sm leading-relaxed shadow-sm ${
@@ -531,19 +434,21 @@ export default function Playground() {
                         : "bg-white text-slate-800 border border-slate-200/80 rounded-bl-none"
                     }`}
                   >
-                    <p className="whitespace-pre-wrap">{msg.content || (isStreaming ? "Thinking..." : "")}</p>
+                    <p className="whitespace-pre-wrap">
+                      {msg.content || (isStreaming ? "Thinking..." : "")}
+                    </p>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Voice ASR Banner */}
+            {/* Voice Transcribed Banner */}
             {transcribedText && (
-              <div className="mx-6 mb-2 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs text-emerald-800">
+              <div className="mx-6 mb-2 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-800 shadow-2xs">
                 <div className="flex items-center space-x-2">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                   <span>
-                    Transcribed with NCAIR1 ({language.toUpperCase()}): <strong>{transcribedText}</strong>
+                    Transcribed ({language.toUpperCase()}): <strong>{transcribedText}</strong>
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -551,7 +456,7 @@ export default function Playground() {
                     type="button"
                     onClick={() => handleSend(transcribedText)}
                     disabled={isStreaming}
-                    className="rounded bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 transition-colors"
+                    className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
                   >
                     Send to N-ATLAS
                   </button>
@@ -566,7 +471,7 @@ export default function Playground() {
               </div>
             )}
 
-            {/* Input & Voice Controls */}
+            {/* Bottom Controls */}
             <div className="border-t border-slate-200 bg-white p-4">
               <div className="mx-auto flex max-w-4xl items-center space-x-3">
                 {/* Record Mic */}
@@ -587,7 +492,7 @@ export default function Playground() {
                 {/* Upload Audio File */}
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => chatFileInputRef.current?.click()}
                   className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 shadow-sm transition-colors"
                   title="Upload Audio File (.ogg, .opus, .wav, .webm)"
                 >
@@ -605,7 +510,9 @@ export default function Playground() {
                       ? "Recording voice note..."
                       : isTranscribing
                       ? "Transcribing with NCAIR1 Whisper..."
-                      : `Ask N-ATLAS in ${language.charAt(0).toUpperCase() + language.slice(1)}...`
+                      : `Ask N-ATLAS in ${
+                          language.charAt(0).toUpperCase() + language.slice(1)
+                        }...`
                   }
                   disabled={isStreaming || isRecording || isTranscribing}
                   className="flex-1 rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
@@ -625,74 +532,6 @@ export default function Playground() {
             </div>
           </main>
         )}
-
-        {/* Sidebar: Diagnostics & Presets */}
-        <aside className="hidden w-80 flex-col border-l border-slate-200 bg-white p-5 lg:flex">
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                System Diagnostics
-              </h2>
-              <div className="mt-3 space-y-2 text-xs">
-                <div className="flex justify-between rounded-lg bg-slate-50 p-2.5 border border-slate-100">
-                  <span className="text-slate-500">LLM Base</span>
-                  <span className="font-semibold text-slate-800">Llama-3 8B (N-ATLaS)</span>
-                </div>
-                <div className="flex justify-between rounded-lg bg-slate-50 p-2.5 border border-slate-100">
-                  <span className="text-slate-500">ASR Checkpoint</span>
-                  <span className="font-semibold text-slate-800">NCAIR1 Whisper</span>
-                </div>
-                <div className="flex justify-between rounded-lg bg-slate-50 p-2.5 border border-slate-100">
-                  <span className="text-slate-500">SDK Target</span>
-                  <span className="font-semibold text-slate-800">@natlas/sdk (v0.1.0)</span>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Prompt Starters
-              </h2>
-              <div className="mt-3 space-y-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLanguage("yoruba");
-                    setInput("Bawo ni mo se le da ile-iṣẹ mi silẹ ni Nigeria?");
-                  }}
-                  className="w-full text-left rounded-lg border border-slate-200 p-2.5 text-xs text-slate-700 hover:border-emerald-500 hover:bg-emerald-50/50 transition-all"
-                >
-                  <p className="font-medium text-emerald-800">Yorùbá: Business Registration</p>
-                  <p className="text-slate-500 mt-0.5 truncate">&ldquo;Bawo ni mo se le da ile-iṣẹ mi silẹ ni Nigeria?&rdquo;</p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLanguage("hausa");
-                    setInput("Yaya ake shuka masara a lokacin damina?");
-                  }}
-                  className="w-full text-left rounded-lg border border-slate-200 p-2.5 text-xs text-slate-700 hover:border-emerald-500 hover:bg-emerald-50/50 transition-all"
-                >
-                  <p className="font-medium text-emerald-800">Hausa: Agriculture Advice</p>
-                  <p className="text-slate-500 mt-0.5 truncate">&ldquo;Yaya ake shuka masara a lokacin damina?&rdquo;</p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLanguage("igbo");
-                    setInput("Kọwaara m uru agụmakwụkwọ bara nye ụmụaka.");
-                  }}
-                  className="w-full text-left rounded-lg border border-slate-200 p-2.5 text-xs text-slate-700 hover:border-emerald-500 hover:bg-emerald-50/50 transition-all"
-                >
-                  <p className="font-medium text-emerald-800">Igbo: Education</p>
-                  <p className="text-slate-500 mt-0.5 truncate">&ldquo;Kọwaara m uru agụmakwụkwọ bara...&rdquo;</p>
-                </button>
-              </div>
-            </div>
-          </div>
-        </aside>
       </div>
     </div>
   );
