@@ -573,20 +573,20 @@ export function PipelineCanvas({
       />
 
       {/* TOP PALETTE: Available Cards */}
-      <div className="border-b border-slate-200 bg-white px-6 py-4 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
+      <div className="border-b border-slate-200 bg-white px-3 sm:px-6 py-3 sm:py-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3">
           <div>
             <h2 className="text-sm font-bold text-slate-900">Task Card Library</h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-[11px] sm:text-xs text-slate-500">
               Click any card to add it to your flow below. Drag cards to reorder or set custom settings.
             </p>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 self-start sm:self-auto shrink-0">
             <button
               type="button"
               onClick={resetFlow}
               disabled={isRunningFlow}
-              className="flex items-center space-x-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors shadow-sm disabled:opacity-50"
+              className="flex items-center space-x-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 sm:px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors shadow-sm disabled:opacity-50"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               <span>Reset</span>
@@ -595,7 +595,7 @@ export function PipelineCanvas({
               type="button"
               onClick={runEntireFlow}
               disabled={isRunningFlow || cards.length === 0}
-              className="flex items-center space-x-1.5 rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors disabled:opacity-50"
+              className="flex items-center space-x-1.5 rounded-lg bg-emerald-600 px-3 sm:px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors disabled:opacity-50"
             >
               {isRunningFlow ? (
                 <>
@@ -613,7 +613,7 @@ export function PipelineCanvas({
         </div>
 
         {/* Palette Card Grid */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {PALETTE_ITEMS.map((item) => {
             const Icon = item.icon;
             return (
@@ -642,7 +642,7 @@ export function PipelineCanvas({
       </div>
 
       {/* CANVAS BELOW: Chained Cards */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-6">
         {cards.length === 0 ? (
           <div className="flex h-64 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 p-8 text-center bg-white/50">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 mb-3">

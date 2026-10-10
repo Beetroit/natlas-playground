@@ -11,9 +11,8 @@ import {
   Code2,
   Layers,
   MessageSquare,
-  Sparkles,
-  Bot,
-  Terminal,
+  Menu,
+  X,
 } from "lucide-react";
 import type { SupportedLanguage } from "@natlas/sdk";
 import { CodeExportModal } from "../components/CodeExportModal";
@@ -27,6 +26,7 @@ interface Message {
 export default function Playground() {
   const [activeView, setActiveView] = useState<"chat" | "pipeline">("chat");
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -202,22 +202,43 @@ export default function Playground() {
         toneEnforcement={toneEnforcement}
       />
 
-      {/* LEFT NAVIGATION SIDEBAR */}
-      <aside className="flex w-72 flex-col border-r border-slate-200 bg-white">
+      {/* Mobile Drawer Backdrop */}
+      {isMobileSidebarOpen && (
+        <div
+          onClick={() => setIsMobileSidebarOpen(false)}
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs md:hidden"
+        />
+      )}
+
+      {/* LEFT NAVIGATION SIDEBAR (Slide-over drawer on mobile, static on desktop) */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-slate-200 bg-white transition-transform duration-200 ease-in-out md:static md:translate-x-0 shrink-0 ${
+          isMobileSidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
+        }`}
+      >
         {/* Brand Header */}
-        <div className="flex items-center space-x-3 border-b border-slate-100 px-5 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold text-lg shadow-sm">
-            ₦
-          </div>
-          <div>
-            <div className="flex items-center space-x-1.5">
-              <h1 className="text-sm font-bold text-slate-900">N-ATLAS Studio</h1>
-              <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                NAIC 2026
-              </span>
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <div className="flex items-center space-x-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold text-lg shadow-sm">
+              ₦
             </div>
-            <p className="text-[11px] text-slate-500">Nigeria&apos;s Sovereign AI</p>
+            <div>
+              <div className="flex items-center space-x-1.5">
+                <h1 className="text-sm font-bold text-slate-900">N-ATLAS Studio</h1>
+                <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                  NAIC 2026
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500">Nigeria&apos;s Sovereign AI</p>
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setIsMobileSidebarOpen(false)}
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 md:hidden"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* View Switcher Tabs */}
@@ -228,7 +249,10 @@ export default function Playground() {
           <div className="flex flex-col space-y-1.5">
             <button
               type="button"
-              onClick={() => setActiveView("chat")}
+              onClick={() => {
+                setActiveView("chat");
+                setIsMobileSidebarOpen(false);
+              }}
               className={`flex items-center space-x-2.5 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all ${
                 activeView === "chat"
                   ? "bg-emerald-50 text-emerald-800 shadow-sm border border-emerald-200"
@@ -241,7 +265,10 @@ export default function Playground() {
 
             <button
               type="button"
-              onClick={() => setActiveView("pipeline")}
+              onClick={() => {
+                setActiveView("pipeline");
+                setIsMobileSidebarOpen(false);
+              }}
               className={`flex items-center space-x-2.5 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all ${
                 activeView === "pipeline"
                   ? "bg-emerald-50 text-emerald-800 shadow-sm border border-emerald-200"
@@ -266,6 +293,7 @@ export default function Playground() {
               setLanguage("yoruba");
               setInput("Bawo ni mo se le da ile-iṣẹ mi silẹ ni Nigeria?");
               if (activeView !== "chat") setActiveView("chat");
+              setIsMobileSidebarOpen(false);
             }}
             className="w-full text-left rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs hover:border-emerald-500 hover:bg-emerald-50/40 transition-all"
           >
@@ -281,6 +309,7 @@ export default function Playground() {
               setLanguage("hausa");
               setInput("Yaya ake shuka masara a lokacin damina?");
               if (activeView !== "chat") setActiveView("chat");
+              setIsMobileSidebarOpen(false);
             }}
             className="w-full text-left rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs hover:border-emerald-500 hover:bg-emerald-50/40 transition-all"
           >
@@ -296,6 +325,7 @@ export default function Playground() {
               setLanguage("igbo");
               setInput("Kọwaara m uru agụmakwụkwọ bara nye ụmụaka.");
               if (activeView !== "chat") setActiveView("chat");
+              setIsMobileSidebarOpen(false);
             }}
             className="w-full text-left rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs hover:border-emerald-500 hover:bg-emerald-50/40 transition-all"
           >
@@ -311,6 +341,7 @@ export default function Playground() {
               setLanguage("pidgin");
               setInput("How I fit start tech career for Lagos?");
               if (activeView !== "chat") setActiveView("chat");
+              setIsMobileSidebarOpen(false);
             }}
             className="w-full text-left rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs hover:border-emerald-500 hover:bg-emerald-50/40 transition-all"
           >
@@ -336,7 +367,7 @@ export default function Playground() {
           <div className="space-y-1.5 text-[11px]">
             <div className="flex justify-between rounded-lg bg-white p-2 border border-slate-100 shadow-2xs">
               <span className="text-slate-500">LLM Model</span>
-              <span className="font-semibold text-slate-800">Llama-3 8B (N-ATLaS)</span>
+              <span className="font-semibold text-slate-800">Llama-3 8B</span>
             </div>
             <div className="flex justify-between rounded-lg bg-white p-2 border border-slate-100 shadow-2xs">
               <span className="text-slate-500">Voice ASR</span>
@@ -351,46 +382,57 @@ export default function Playground() {
       </aside>
 
       {/* MAIN WORKSPACE AREA */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top Header */}
-        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3.5 shadow-2xs">
-          <div>
-            <h2 className="text-base font-bold text-slate-900">
-              {activeView === "chat" ? "Multilingual Chat Stream" : "Visual Studio Flow"}
-            </h2>
-            <p className="text-xs text-slate-500">
-              {activeView === "chat"
-                ? "Talk to N-ATLAS with real-time text and voice input"
-                : "Assemble task cards to chain speech, translation, and AI chat"}
-            </p>
+        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-3 sm:px-6 py-3 shadow-2xs">
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+            {/* Mobile Hamburger Button */}
+            <button
+              type="button"
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 md:hidden shrink-0 shadow-2xs"
+              title="Open Navigation"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 truncate">
+                {activeView === "chat" ? "Multilingual Chat Stream" : "Visual Studio"}
+              </h2>
+              <p className="text-[11px] sm:text-xs text-slate-500 hidden sm:block truncate">
+                {activeView === "chat"
+                  ? "Talk to N-ATLAS with real-time text and voice input"
+                  : "Assemble task cards to chain speech, translation, and AI chat"}
+              </p>
+            </div>
           </div>
 
           {/* Top Controls */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
             {/* Export Code Button */}
             <button
               type="button"
               onClick={() => setIsCodeModalOpen(true)}
-              className="flex items-center space-x-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+              className="flex items-center space-x-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
               title="Export ready-to-run Python, TypeScript, and cURL code"
             >
               <Code2 className="h-4 w-4 text-emerald-600" />
-              <span>Export Code</span>
+              <span className="hidden sm:inline">Export Code</span>
             </button>
 
             {/* Language Selector */}
-            <div className="flex items-center space-x-2">
-              <label className="text-xs font-medium text-slate-600">Language:</label>
+            <div className="flex items-center space-x-1">
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value as SupportedLanguage)}
-                className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-2xs focus:border-emerald-500 focus:outline-none"
+                className="rounded-xl border border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 shadow-2xs focus:border-emerald-500 focus:outline-none"
               >
                 <option value="yoruba">Yorùbá</option>
                 <option value="hausa">Hausa</option>
                 <option value="igbo">Igbo</option>
-                <option value="pidgin">Nigerian Pidgin</option>
-                <option value="english">Nigerian English</option>
+                <option value="pidgin">Pidgin</option>
+                <option value="english">English</option>
               </select>
             </div>
 
@@ -398,14 +440,16 @@ export default function Playground() {
             <button
               type="button"
               onClick={() => setToneEnforcement(!toneEnforcement)}
-              className={`flex items-center space-x-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors shadow-2xs ${
+              className={`flex items-center space-x-1 rounded-xl border px-2 py-1.5 text-xs font-semibold transition-colors shadow-2xs ${
                 toneEnforcement
                   ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                   : "border-slate-200 bg-white text-slate-500"
               }`}
+              title="Toggle Dialect Tone Guard"
             >
               <ShieldCheck className="h-4 w-4" />
-              <span>Tone Guard: {toneEnforcement ? "ON" : "OFF"}</span>
+              <span className="hidden sm:inline">Tone: </span>
+              <span>{toneEnforcement ? "ON" : "OFF"}</span>
             </button>
           </div>
         </header>
@@ -419,7 +463,7 @@ export default function Playground() {
         ) : (
           <main className="flex flex-1 flex-col overflow-hidden bg-slate-50/50">
             {/* Message Stream */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
               {messages.map((msg, idx) => (
                 <div
                   key={idx}
@@ -428,7 +472,7 @@ export default function Playground() {
                   }`}
                 >
                   <div
-                    className={`max-w-2xl rounded-2xl px-5 py-3.5 text-sm leading-relaxed shadow-sm ${
+                    className={`max-w-[88%] sm:max-w-2xl rounded-2xl px-4 py-3 sm:px-5 sm:py-3.5 text-xs sm:text-sm leading-relaxed shadow-sm ${
                       msg.role === "user"
                         ? "bg-emerald-600 text-white rounded-br-none"
                         : "bg-white text-slate-800 border border-slate-200/80 rounded-bl-none"
@@ -444,26 +488,26 @@ export default function Playground() {
 
             {/* Voice Transcribed Banner */}
             {transcribedText && (
-              <div className="mx-6 mb-2 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-800 shadow-2xs">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  <span>
-                    Transcribed ({language.toUpperCase()}): <strong>{transcribedText}</strong>
+              <div className="mx-3 sm:mx-6 mb-2 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 shadow-2xs">
+                <div className="flex items-center space-x-2 truncate mr-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="truncate">
+                    Transcribed: <strong>{transcribedText}</strong>
                   </span>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1.5 shrink-0">
                   <button
                     type="button"
                     onClick={() => handleSend(transcribedText)}
                     disabled={isStreaming}
-                    className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+                    className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 transition-colors"
                   >
-                    Send to N-ATLAS
+                    Send
                   </button>
                   <button
                     type="button"
                     onClick={() => setTranscribedText(null)}
-                    className="text-slate-400 hover:text-slate-600"
+                    className="text-slate-400 hover:text-slate-600 p-1"
                   >
                     ✕
                   </button>
@@ -472,31 +516,35 @@ export default function Playground() {
             )}
 
             {/* Bottom Controls */}
-            <div className="border-t border-slate-200 bg-white p-4">
-              <div className="mx-auto flex max-w-4xl items-center space-x-3">
+            <div className="border-t border-slate-200 bg-white p-2.5 sm:p-4">
+              <div className="mx-auto flex max-w-4xl items-center space-x-2 sm:space-x-3">
                 {/* Record Mic */}
                 <button
                   type="button"
                   onClick={isRecording ? stopRecording : startRecording}
                   disabled={isTranscribing}
-                  className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all shadow-sm ${
+                  className={`flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl transition-all shadow-sm ${
                     isRecording
                       ? "bg-red-500 text-white animate-pulse"
                       : "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
                   }`}
                   title={isRecording ? "Stop Recording" : "Record Voice Note"}
                 >
-                  {isRecording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                  {isRecording ? (
+                    <MicOff className="h-4 w-4 sm:h-5 sm:w-5" />
+                  ) : (
+                    <Mic className="h-4 w-4 sm:h-5 sm:w-5" />
+                  )}
                 </button>
 
                 {/* Upload Audio File */}
                 <button
                   type="button"
                   onClick={() => chatFileInputRef.current?.click()}
-                  className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 shadow-sm transition-colors"
+                  className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 shadow-sm transition-colors"
                   title="Upload Audio File (.ogg, .opus, .wav, .webm)"
                 >
-                  <Upload className="h-5 w-5" />
+                  <Upload className="h-4 w-4 sm:h-5 sm:w-5" />
                 </button>
 
                 {/* Text Input */}
@@ -509,13 +557,13 @@ export default function Playground() {
                     isRecording
                       ? "Recording voice note..."
                       : isTranscribing
-                      ? "Transcribing with NCAIR1 Whisper..."
+                      ? "Transcribing with NCAIR1..."
                       : `Ask N-ATLAS in ${
                           language.charAt(0).toUpperCase() + language.slice(1)
                         }...`
                   }
                   disabled={isStreaming || isRecording || isTranscribing}
-                  className="flex-1 rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-slate-50 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
 
                 {/* Send Button */}
@@ -523,9 +571,9 @@ export default function Playground() {
                   type="button"
                   onClick={() => handleSend()}
                   disabled={!input.trim() || isStreaming}
-                  className="flex h-11 items-center space-x-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                  className="flex h-10 sm:h-11 shrink-0 items-center space-x-1.5 rounded-xl bg-emerald-600 px-3.5 sm:px-5 text-xs sm:text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
                 >
-                  <span>Send</span>
+                  <span className="hidden sm:inline">Send</span>
                   <Send className="h-4 w-4" />
                 </button>
               </div>
